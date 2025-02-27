@@ -34,5 +34,5 @@ def prepare_data(args, data):
 
 def save_best_model(model, args, fold_idx, epoch, loss_train, loss_val, r2):
     """保存最佳模型"""
-    save_path = f'/scratch/users/yanyichu/UTR-LM/Sample/saved_models/{args.prefix}_fold{fold_idx}_epoch{epoch}_lr{args.lr}.pt'
+    save_path = os.path.join(config.model_dir, f'{args.prefix}_fold{fold_idx}_epoch{epoch}_lr{args.lr}.pt')
     torch.save(model.state_dict(), save_path)

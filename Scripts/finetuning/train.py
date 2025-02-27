@@ -7,6 +7,8 @@ from sklearn.model_selection import KFold
 from copy import deepcopy
 from tqdm import trange
 from esm import Alphabet
+from config import config
+import os
 
 from models import CNN_linear
 from data_utils import load_data, generate_dataset_dataloader, generate_trainbatch_loader
@@ -17,10 +19,12 @@ import logging
 
 def setup_logging(args):
     """设置日志记录"""
+    log_dir = os.path.join(config.output_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
     logging.basicConfig(
         format='%(asctime)s - %(levelname)s - %(message)s',
         level=logging.INFO,
-        filename=f'/scratch/users/yanyichu/UTR-LM/Sample/logs/{args.prefix}.log'
+        filename=os.path.join(log_dir, f'{args.prefix}.log')
     )
 
 def setup_seed(seed):

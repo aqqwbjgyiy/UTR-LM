@@ -13,7 +13,7 @@ def plot_results(args, model_best, ep_best, fold_idx, train_pred, val_pred, test
     plot_predictions(axes[1], train_pred, val_pred, test_pred, args)
     
     # 保存图表
-    plt.savefig(f'/scratch/users/yanyichu/UTR-LM/Sample/figures/{args.prefix}_fold{fold_idx}.tif')
+    plt.savefig(os.path.join(config.figure_dir, f'{args.prefix}_fold{fold_idx}.tif'))
     plt.close()
 
 def generate_and_save_results(args, model_best, ep_best, fold_idx):

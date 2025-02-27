@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+from config import config
 import argparse
 from train import train_model
 
@@ -27,8 +28,9 @@ def parse_args():
     
     # 训练数据相关参数
     parser.add_argument('--train_file', type=str, default='4.1_train_data_GSM3130435_egfp_unmod_1.csv')
-    parser.add_argument('--modelfile', type=str, default='/scratch/users/yanyichu/UTR-LM/saved_models/ESM2_1.4_five_species_TrainLossMin_6layers_16heads_128embedsize_4096batchToks.pkl')
-    parser.add_argument('--finetune_modelfile', type=str, default='/scratch/users/yanyichu/UTR-LM/saved_models/CVESM2lr1e-5_DDP9.1_unmod_1_10folds_rl_LabelScalerTrue_LabelLog2False_AvgEmbFalse_BosEmbTrue_CNNlayer0_epoch300_nodes40_dropout30.2_finetuneTrue_huberlossTrue_magicFalse_fold0_epoch19_lr0.1.pt')
+    # 修改模型文件路径参数
+    parser.add_argument('--modelfile', type=str, default=os.path.join(config.model_dir, 'ESM2_1.4_five_species_TrainLossMin_6layers_16heads_128embedsize_4096batchToks.pkl'))
+    parser.add_argument('--finetune_modelfile', type=str, default=os.path.join(config.model_dir, 'CVESM2lr1e-5_DDP9.1_unmod_1_10folds_rl_LabelScalerTrue_LabelLog2False_AvgEmbFalse_BosEmbTrue_CNNlayer0_epoch300_nodes40_dropout30.2_finetuneTrue_huberlossTrue_magicFalse_fold0_epoch19_lr0.1.pt'))
 
     # 功能开关参数
     parser.add_argument('--test1fold', action='store_true')
