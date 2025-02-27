@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 from copy import deepcopy
@@ -5,13 +6,26 @@ from sklearn import preprocessing
 from esm import FastaBatchedDataset
 from torch.utils.data.distributed import DistributedSampler
 import torch
+from config import config
 
 def load_data(args, seed):
     """加载并预处理数据"""
+    # 检查数据文件是否存在
     original_train_file = args.train_file.replace('_delATG', '').replace('_ATGtoUNK', '').replace('_ATGtoCAA', '')
-    original_train_data = pd.read_csv(os.path.join(config.data_dir, original_train_file))
+    train_file_path = os.path.join(config.data_dir, original_train_file)
+    if not os.path.exists(train_file_path):
+        raise FileNotFoundError(f"Training file not found: {train_file_path}\n"
+                              f"Please ensure the data directory structure is correct:\n"
+                              f"- Data directory: {config.data_dir}\n"
+                              f"- Required file: {original_train_file}")
 
-    train_data = pd.read_csv(os.path.join(config.data_dir, args.train_file))
+    original_train_data = pd.read_csv(train_file_path)
+
+    # 检查训练文件
+    train_file_path = os.path.join(config.data_dir, args.train_file)
+    if not os.path.exists(train_file_path):
+        raise FileNotFoundError(f"Training file not found: {train_file_path}")
+    train_data = pd.read_csv(train_file_path)
     
     if args.train_atg:
         data = train_data[train_data[args.seq_type].str.contains('ATG')]
@@ -26,8 +40,12 @@ def load_data(args, seed):
         data = data[data[args.label_type] != 0]
         data[f'{args.label_type}_log2'] = data[args.label_type].apply(np.log2)
 
+    # 检查测试文件
     test_file = args.train_file.replace('train', 'test')
-    e_test = pd.read_csv(os.path.join(config.data_dir, test_file))
+    test_file_path = os.path.join(config.data_dir, test_file)
+    if not os.path.exists(test_file_path):
+        raise FileNotFoundError(f"Test file not found: {test_file_path}")
+    e_test = pd.read_csv(test_file_path)
     
     e_test = e_test.sample(frac=1, random_state=seed).reset_index(drop=True)
     

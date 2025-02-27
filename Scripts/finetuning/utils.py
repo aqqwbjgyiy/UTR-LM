@@ -4,6 +4,12 @@ import torch.distributed as dist
 
 def setup_device(args):
     """设置训练设备"""
+    # 检查必要的环境变量
+    required_env_vars = ['RANK', 'WORLD_SIZE', 'MASTER_ADDR', 'MASTER_PORT']
+    for var in required_env_vars:
+        if var not in os.environ:
+            raise ValueError(f"Environment variable {var} is not set. Please use run_train.sh to start training.")
+    
     device_ids = list(map(int, args.device_ids.split(',')))
     dist.init_process_group(backend='nccl')
     device = torch.device('cuda:{}'.format(device_ids[args.local_rank]))
@@ -14,15 +20,29 @@ def get_model_info(modelfile):
     """从模型文件名解析模型信息"""
     model_info = modelfile.split('/')[-1].split('_')
     layers, heads, embed_dim, batch_toks = 6, 16, 128, 4096
+    
     for item in model_info:
         if 'layers' in item:
-            layers = int(item[0])
+            try:
+                layers = int(''.join(filter(str.isdigit, item)))
+            except ValueError:
+                pass
         elif 'heads' in item:
-            heads = int(item[:-5])
+            try:
+                heads = int(''.join(filter(str.isdigit, item)))
+            except ValueError:
+                pass
         elif 'embedsize' in item:
-            embed_dim = int(item[:-9])
+            try:
+                embed_dim = int(''.join(filter(str.isdigit, item)))
+            except ValueError:
+                pass
         elif 'batchToks' in item:
-            batch_toks = int(item[:-9])
+            try:
+                batch_toks = int(''.join(filter(str.isdigit, item)))
+            except ValueError:
+                pass
+    
     return layers, heads, embed_dim, batch_toks
 
 def prepare_data(args, data):

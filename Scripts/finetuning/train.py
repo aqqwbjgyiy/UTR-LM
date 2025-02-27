@@ -12,7 +12,7 @@ import os
 
 from models import CNN_linear
 from data_utils import load_data, generate_dataset_dataloader, generate_trainbatch_loader
-from utils import setup_device, get_model_info
+from utils import setup_device, get_model_info, prepare_data  # 添加 prepare_data 导入
 from metrics import performances
 from visualization import plot_results
 import logging
@@ -143,7 +143,10 @@ def train_model(args):
         
         # 获取模型信息
         layers, heads, embed_dim, batch_toks = get_model_info(args.modelfile)
-        inp_len = 50
+        inp_len = 50  # Move this to args or config if needed
+        
+        # 初始化 alphabet
+        alphabet = Alphabet.from_architecture("ESM-1b")
         
         # 加载数据
         original_train_data, data, e_test = load_data(args, args.seed)
@@ -172,11 +175,11 @@ def train_model(args):
             val_dataset, val_dataloader = generate_dataset_dataloader(e_val, args.label_type, batch_toks, alphabet)
             
             # 创建模型
-            model = create_model(args, device, device_ids, layers, heads, embed_dim, alphabet)
+            model = create_model(args, device, device_ids, layers, heads, embed_dim, alphabet, inp_len)
             
-            # 训练循环
+            # 训练循环 - 添加 train_batches_sampler 和 e_train 参数
             best_model, metrics = train_fold(args, model, train_batches_loader, val_dataloader, 
-                                        device, i, train_obj_col)
+                                        device, i, train_obj_col, train_batches_sampler, e_train)
             
             # 保存结果
             if args.test1fold:
@@ -188,24 +191,57 @@ def train_model(args):
             logging.error(f"Training failed with error: {str(e)}")
             raise e
 
-def create_model(args, device, device_ids, layers, heads, embed_dim, alphabet):
+def create_model(args, device, device_ids, layers, heads, embed_dim, alphabet, inp_len):
     """创建并初始化模型"""
+    # Check if model files exist
+    if args.load_wholemodel and not os.path.exists(args.finetune_modelfile):
+        raise FileNotFoundError(
+            f"Finetune model file not found: {args.finetune_modelfile}"
+        )
+    if not args.load_wholemodel and not os.path.exists(args.modelfile):
+        raise FileNotFoundError(
+            f"Model file not found: {args.modelfile}"
+        )
+
+    # Create model
     model = CNN_linear(args, embed_dim, inp_len, layers, heads, alphabet).to(device)
     
+    # Load model weights
     storage_id = int(device_ids[args.local_rank])
-    if args.load_wholemodel:
-        model.load_state_dict({k.replace('module.', ''):v for k,v in 
-                             torch.load(args.finetune_modelfile, 
-                                      map_location=lambda storage, 
-                                      loc: storage.cuda(storage_id)).items()}, 
-                            strict=False)
-    else:
-        model.esm2.load_state_dict({k.replace('module.', ''):v for k,v in 
-                                   torch.load(args.modelfile, 
-                                            map_location=lambda storage, 
-                                            loc: storage.cuda(storage_id)).items()}, 
-                                  strict=False)
-                                  
+    try:
+        if args.load_wholemodel:
+            state_dict = torch.load(args.finetune_modelfile, 
+                                  map_location=lambda storage, loc: storage.cuda(storage_id))
+        else:
+            state_dict = torch.load(args.modelfile, 
+                                  map_location=lambda storage, loc: storage.cuda(storage_id))
+        
+        # Remove 'module.' prefix if present
+        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        
+        # Filter out parameters that do not match
+        model_state = model.esm2.state_dict()
+        filtered_state_dict = {}
+        
+        for name, param in state_dict.items():
+            if name in model_state:
+                if param.size() == model_state[name].size():
+                    filtered_state_dict[name] = param
+                else:
+                    logging.warning(f"跳过参数 {name} (大小不匹配): "
+                                  f"检查点大小 {param.size()} vs 模型大小 {model_state[name].size()}")
+        
+        # Load weights that match current model's architecture
+        if args.load_wholemodel:
+            model.load_state_dict(filtered_state_dict, strict=False)
+        else:
+            model.esm2.load_state_dict(filtered_state_dict, strict=False)
+            
+    except Exception as e:
+        logging.error(f"加载模型权重失败: {str(e)}")
+        raise
+
+    # Set training mode
     if not args.finetune:
         for name, value in model.named_parameters():
             if 'esm2' in name:
@@ -218,7 +254,7 @@ def create_model(args, device, device_ids, layers, heads, embed_dim, alphabet):
                 
     return model
 
-def train_fold(args, model, train_loader, val_loader, device, fold_idx, train_obj_col):
+def train_fold(args, model, train_loader, val_loader, device, fold_idx, train_obj_col, train_sampler, train_data):
     """训练单个fold"""
     optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()),
                                lr=args.lr,
@@ -231,9 +267,9 @@ def train_fold(args, model, train_loader, val_loader, device, fold_idx, train_ob
     loss_train_list, loss_val_list = [], []
     
     for epoch in trange(args.init_epochs+1, args.init_epochs + args.epochs + 2):
-        train_batches_sampler.set_epoch(epoch)
+        train_sampler.set_epoch(epoch)
         
-        metrics_train, loss_train = train_step(e_train, train_loader, model, 
+        metrics_train, loss_train = train_step(train_data, train_loader, model, 
                                              device, criterion, optimizer, 
                                              args, epoch, train_obj_col)
         loss_train_list.append(loss_train)
