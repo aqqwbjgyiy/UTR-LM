@@ -67,7 +67,7 @@ einops==0.6.0
 entrypoints @ file:///home/conda/feedstock_root/build_artifacts/entrypoints_1643888246732/work
 et-xmlfile==1.1.0
 executing==1.2.0
-fair-esm @ git+https://github.com/facebookresearch/esm.git@900251ba3e2b7cdc06b44b10dfa3a0c1dd49752b
+fair-esm@git+https://github.com/facebookresearch/esm.git@900251ba3e2b7cdc06b44b10dfa3a0c1dd49752b
 fastai @ file:///home/jhoward/anaconda3/conda-bld/fastai_1608667380828/work
 fastcore @ file:///Users/jhoward/mambaforge/conda-bld/fastcore_1658788847717/work
 fasteners==0.18
