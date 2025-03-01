@@ -66,14 +66,14 @@ def generate_dataset_dataloader(e_data, obj_col, batch_toks, alphabet):
     print(f"{len(dataset)} sequences")
     return dataset, dataloader
 
-def generate_trainbatch_loader(e_data, obj_col, batch_toks, alphabet):
+def generate_trainbatch_loader(e_data, obj_col, batch_toks, alphabet, num_workers=8):
     """生成训练批次加载器"""
     dataset = FastaBatchedDataset(e_data.loc[:,obj_col], e_data.utr, mask_prob=0.0)
     batches = dataset.get_batch_indices(toks_per_batch=batch_toks, extra_toks_per_seq=1)
     batches_sampler = DistributedSampler(batches, shuffle=True)
     batches_loader = torch.utils.data.DataLoader(batches,
                                               batch_size=1,
-                                              num_workers=8,
+                                              num_workers=num_workers,
                                               sampler=batches_sampler)
     print(f"{len(dataset)} sequences")
     print(f'{len(batches)} batches')

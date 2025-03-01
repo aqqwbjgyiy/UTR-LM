@@ -3,6 +3,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 import random
 import numpy as np
+import pandas as pd  # 添加pandas导入
 from sklearn.model_selection import KFold
 from copy import deepcopy
 from tqdm import trange
@@ -58,7 +59,8 @@ def train_step(data, batches_loader, model, device, criterion, optimizer, args, 
                         toks = toks.to(device)
                         labels = torch.FloatTensor(labels).to(device).reshape(-1, 1)
                         
-                        outputs = model(toks, return_representation=True, return_contacts=True)
+                        # Fix: Pass the required arguments to the model's forward method
+                        outputs = model(toks, args=args, layers=args.layers, return_representation=True, return_contacts=True)
                         loss = criterion(outputs, labels)
                         
                         optimizer.zero_grad()
@@ -77,6 +79,12 @@ def train_step(data, batches_loader, model, device, criterion, optimizer, args, 
             except Exception as e:
                 logging.error(f"Error processing batch {i}: {str(e)}")
                 continue
+                
+        # Check if we have any valid predictions
+        if len(y_true_list) == 0 or len(y_pred_list) == 0:
+            logging.error(f"No valid predictions in epoch {epoch}. Skipping metrics calculation.")
+            # Return dummy metrics and infinity loss to indicate failure
+            return [0, 0, 0, 0], float('inf')
                 
         loss_epoch = float(torch.Tensor(loss_list).mean()) if loss_list else float('inf')
         logging.info(f'Train: Epoch-{epoch}/{args.epochs} | Loss = {loss_epoch:.4f}')
@@ -100,7 +108,8 @@ def eval_step(dataloader, model, device, criterion, args, epoch, data=None):
             toks = toks.to(device)
             labels = torch.FloatTensor(labels).to(device).reshape(-1, 1)
             
-            outputs = model(toks, return_representation=True, return_contacts=True)
+            # Fix: Pass the layer number directly instead of as a list
+            outputs = model(toks, args=args, layers=args.layers, return_representation=True, return_contacts=True)
             y_true_list.extend(labels.cpu().reshape(-1).tolist())
             y_pred = outputs.reshape(-1).cpu().detach().tolist()
             y_pred_list.extend(y_pred)
@@ -145,6 +154,11 @@ def train_model(args):
         layers, heads, embed_dim, batch_toks = get_model_info(args.modelfile)
         inp_len = 50  # Move this to args or config if needed
         
+        # 如果未指定layers参数，使用从模型文件名解析出的值
+        if args.layers is None:
+            args.layers = layers
+            logging.info(f"Using layers={layers} from model filename")
+        
         # 初始化 alphabet
         alphabet = Alphabet.from_architecture("ESM-1b")
         
@@ -171,7 +185,7 @@ def train_model(args):
             
             # 准备数据加载器
             train_dataset, train_batches, train_batches_sampler, train_batches_loader = \
-                generate_trainbatch_loader(e_train, train_obj_col, batch_toks, alphabet)
+                generate_trainbatch_loader(e_train, train_obj_col, batch_toks, alphabet, args.num_workers)
             val_dataset, val_dataloader = generate_dataset_dataloader(e_val, args.label_type, batch_toks, alphabet)
             
             # 创建模型
@@ -181,7 +195,7 @@ def train_model(args):
             best_model, metrics = train_fold(args, model, train_batches_loader, val_dataloader, 
                                         device, i, train_obj_col, train_batches_sampler, e_train)
             
-            # 保存结果
+             # 保存结果
             if args.test1fold:
                 break
             best_epoch_list.append(metrics['best_epoch'])

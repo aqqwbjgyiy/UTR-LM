@@ -13,6 +13,8 @@ def parse_args():
     parser.add_argument('--local_rank', type=int, default=-1, help="DDP parameter, do not modify")
     parser.add_argument('--log_interval', type=int, default=50, help="Log Interval")
     parser.add_argument('--seed', type=int, default=1337)
+    # 添加num_workers参数
+    parser.add_argument('--num_workers', type=int, default=0, help="Number of workers for data loading")
 
     # 模型训练相关参数
     parser.add_argument('--prefix', type=str, default='ESM2SISS_FS4.1.ep93.1e-2.dr5')
@@ -25,6 +27,9 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.1)
     parser.add_argument('--folds', type=int, default=10)
     parser.add_argument('--patience', type=int, default=0)
+    # 添加layers参数
+    # 在parse_args函数中添加layers参数
+    parser.add_argument('--layers', type=int, default=None, help="指定使用模型的哪一层进行特征提取")
     
     # 训练数据相关参数
     parser.add_argument('--train_file', type=str, default='4.1_train_data_GSM3130435_egfp_unmod_1.csv')
