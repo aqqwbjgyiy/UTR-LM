@@ -13,9 +13,9 @@ import os
 
 from models import CNN_linear
 from data_utils import load_data, generate_dataset_dataloader, generate_trainbatch_loader
-from utils import setup_device, get_model_info, prepare_data  # 添加 prepare_data 导入
+from utils import setup_device, get_model_info, prepare_data, save_best_model # 添加 prepare_data 导入
 from metrics import performances
-from visualization import plot_results
+from visualization import plot_results, generate_and_save_results
 import logging
 
 def setup_logging(args):
@@ -303,6 +303,10 @@ def train_fold(args, model, train_loader, val_loader, device, fold_idx, train_ob
                 model_best = deepcopy(model)
                 
             if epoch % args.log_interval == 0:
-                generate_and_save_results(args, model_best, ep_best, fold_idx)
+                # Pass the required loaders to generate_and_save_results
+                generate_and_save_results(args, model_best, ep_best, fold_idx, 
+                                        train_loader=train_loader,
+                                        val_loader=val_loader)
                 
     return model_best, {'best_epoch': ep_best, 'best_r2': r2_best}
+
